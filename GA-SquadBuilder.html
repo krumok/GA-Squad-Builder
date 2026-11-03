@@ -93,20 +93,17 @@ details[open]>summary::after{transform:rotate(-135deg);margin-top:4px}
 @keyframes fl{0%{background:color-mix(in srgb,var(--pri) 28%,var(--card))}100%{background:var(--card)}}
 #st.flash{animation:fl 1s ease-out}
 @media (prefers-reduced-motion:reduce){#st.flash{animation:none}}
+.acc{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 12px;font-size:14px;color:var(--mut)}
+.acc b{color:var(--ink)}
 </style>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-3FVFR6N599"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-3FVFR6N599');
-</script>  
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-3FVFR6N599');</script>
 </head>
 <body>
 <main>
 <h1>GA – Squad Builder v.0.1</h1>
+<div id="acc" class="acc">Verifica accesso…</div>
 
 <section>
 <details>
@@ -197,12 +194,12 @@ const FAC=["Earth Federation","Londo Bell","Asticassia"];
 const KEY="ga-squadre2";
 const SETS=[["ST01","Starter Set 01"],["PA01","Paint Pack 01"],["EX01","Espansione 01"],["EX02","Espansione 02"]];
 const own=id=>S.showAll||S.sets.includes(id.split("-")[0]);
-const fresh=()=>({squads:[{n:"Squadra A",ids:[],deck:[],mu:3,mv:25}],a:0,sets:["ST01"],showAll:false,v3:1});
+const fresh=()=>({squads:[],a:0,sets:["ST01"],showAll:false,v3:1});
 let S=fresh();
 try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&Array.isArray(p.squads)){S=p;S.sets=p.v3&&p.sets?p.sets:["ST01"];S.v3=1;S.showAll=!!p.showAll;S.squads.forEach(s=>{s.ids=(s.ids||[]).filter(i=>U(i));s.deck=(s.deck||[]).filter(c=>C(c));s.mu=s.mu||p.mu||3;s.mv=s.mv||p.mv||25})}}}catch(e){}
 function U(id){return UN.find(u=>u.id===id)}
 function C(id){return TC.find(c=>c.id===id)}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}window.onSave&&window.onSave()};
 const $=i=>document.getElementById(i);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const sq=()=>S.squads[S.a];
@@ -294,6 +291,43 @@ $("q").addEventListener("input",rCat);
 $("tq").addEventListener("input",rTcat);
 $("sn").addEventListener("input",e=>{sq().n=e.target.value||"Squadra";save();rCmp();rSticky()});
 init();
+window.GA={get:()=>S,apply:p=>{p.squads=(p.squads||[]).map(s=>({...s,ids:(s.ids||[]).filter(i=>U(i)),deck:(s.deck||[]).filter(c=>C(c)),mu:s.mu||3,mv:s.mv||25}));p.sets=p.sets||["ST01"];p.showAll=!!p.showAll;p.a=Math.max(0,Math.min(p.a||0,p.squads.length-1));p.v3=1;S=p;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}all()},fresh};
+setTimeout(()=>{if(!window.GA_ready)$("acc").textContent="Accesso non disponibile: controlla la connessione."},8000);
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+import {getFirestore,doc,getDoc,setDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyBeLPW6e72yWrfU0WAMZDa5wi7dER9xXf0",authDomain:"ga-app-bb448.firebaseapp.com",projectId:"ga-app-bb448",storageBucket:"ga-app-bb448.firebasestorage.app",messagingSenderId:"1052999710015",appId:"1:1052999710015:web:0ea1b488f0a258e873cf8a"});
+const auth=getAuth(app),db=getFirestore(app);
+window.GA_ready=true;
+const acc=document.getElementById("acc");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function ui(user,msg){
+acc.innerHTML=user?`<span>Account: <b>${esc(user.displayName||user.email||"")}</b>${msg?" · "+esc(msg):""}</span><button id="lo">Esci</button>`:`<span>${msg?esc(msg):"Senza accesso le squadre restano solo su questo dispositivo."}</span><button class="p" id="li">Accedi con Google</button>`}
+acc.addEventListener("click",async e=>{
+if(e.target.id==="li"){try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(err){if(err.code!=="auth/popup-closed-by-user"&&err.code!=="auth/cancelled-popup-request")ui(null,"Accesso non riuscito ("+(err.code||"errore")+").")}}
+else if(e.target.id==="lo"){try{await signOut(auth)}catch(err){}}
+});
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{v===null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const upload=(user)=>setDoc(doc(db,"users",user.uid),{state:JSON.stringify(GA.get()),updated:serverTimestamp()});
+function merge(cloud,local){const names=new Set(cloud.squads.map(s=>s.n));local.squads.forEach(s=>{let n=s.n;if(names.has(n))n+=" (da questo dispositivo)";names.add(n);cloud.squads.push({...s,n})});return cloud}
+let was=false,tm;
+onAuthStateChanged(auth,async user=>{
+if(!user){if(was){GA.apply(GA.fresh());lsSet("ga-synced-uid",null)}was=false;ui(null);return}
+was=true;ui(user,"sincronizzo…");
+try{
+const ref=doc(db,"users",user.uid),snap=await getDoc(ref),local=GA.get(),synced=lsGet("ga-synced-uid")===user.uid;
+let st,write=false;
+if(snap.exists()){st=JSON.parse(snap.data().state);if(!synced&&local.squads.length){st=merge(st,local);write=true}}
+else{st=local;write=true}
+GA.apply(st);lsSet("ga-synced-uid",user.uid);
+if(write)await upload(user);
+ui(user,"salvato nel tuo account");
+}catch(err){console.error(err);ui(user,"errore di sincronizzazione")}
+});
+window.onSave=()=>{const u=auth.currentUser;if(!u)return;clearTimeout(tm);ui(u,"salvo…");tm=setTimeout(async()=>{try{await upload(u);ui(u,"salvato nel tuo account")}catch(err){console.error(err);ui(u,"errore di salvataggio")}},800)};
 </script>
 </body>
 </html>
